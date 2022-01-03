@@ -7,7 +7,7 @@ $(function(){
             var msg = "Nobody is here";
             
             if(pets.length > 0){
-                msg = pets[0].animal + " "+ pets[0].color; 
+                msg = pets[0].animal + " " + pets[0].color; 
             }
         $(".skills").text(msg);
         });
