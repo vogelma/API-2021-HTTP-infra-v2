@@ -29,7 +29,7 @@ function generatePets(){
     var pets = [];
     for(var i = 0; i < numberOfPets; i++){
         var name = chance.animal();
-        var color = chance.color();
+        var color = chance.color({format: 'hex'});
 
         pets.push({
             animal: name,
