@@ -75,9 +75,9 @@ la commande donné dans le webcast:
 
 Pour notre infrastructure nous trouvé les adresses:
 
-ip pour le container php-web-static: 172.17.0.3
+ip pour le container php-web-static: 172.17.0.2
 
-ip pour le container js-web-dynamic: 172.17.0.2
+ip pour le container js-web-dynamic: 172.17.0.3
 
 La config pour les sites sont diponible dans le fichier conf/sites-available/001-reverse-proxy.conf. Le site statique est à la racine du site et le site dynamique avec le flux json est à l'adresse /api/students/.
 
@@ -118,8 +118,11 @@ Cette partie permet plus de flexibilté car l'adresse ip des deux containers est
 
 Nous utilisons -e pour mettre des arguments qui sont des valeurs de variables que le script php récupére pour mettre le fichier de configuration.
 
-Le script apache2-foreground se lance au démarrage du container. C'est lui qui met le résulat du script php dans le fichie de configuration du reverse proxy. Après cela il faut relancer apache2 pour prendre en compte les modifications. Nous avons utilisé service au lieu de ce qui était présenter dans la vidéo car plus simple d'utilisation.  
+Le script apache2-foreground se lance au démarrage du container. C'est lui qui met le résulat du script php dans le fichie de configuration du reverse proxy. Après cela il faut relancer apache2 pour prendre en compte les modifications. Nous nous sommes basé sur le fichier pour notre version de php car celui de la vidéo n'est plus d'actualité.
+Lien du fichier pour notre version php: [php:7.2/apache2-foreground](https://github.com/docker-library/php/blob/fbba7966bc4ca30a8bb2482cd694a798a50f4406/7.2/buster/apache/apache2-foreground)
 
-    docker run -e STATIC_APP = 172.17.0.3 -e DYNAMIC_APP=172.17.0.2 --name apache-rp -p 8080:80 api-rp
+Finalement on construit l'image puis on lance le container et les deux sites sont visibles à l'adresse http://demo.api.ch:8080 et http://demo.api.ch:8080/api/students
 
-Pour le moment cette partie n'est fonctionnelle qui si nous lançons en interactif le container car sinon il s'éteint de suite. Le problème est inconnu car si nous ne lancons pas en background le container le statut de apache2 est bien running mais docker ps montre que le container est éteint.
+    docker build -t api-rp .
+    docker run -d -e STATIC_APP=172.17.0.2:80 -e DYNAMIC_APP=172.17.0.3:3000 --name apache-rp -p 8080:80 api-rp
+
