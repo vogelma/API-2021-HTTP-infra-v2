@@ -1,0 +1,38 @@
+version: '3'
+
+services:
+  reverse-proxy:
+    # The official v2 Traefik docker image
+    image: traefik:v2.5
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --providers.docker --api.insecure=true
+    ports:
+      # The HTTP port
+      - "9090:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  apache_static:
+    image: api-static
+    deploy:
+      replicas: 1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apache_static.rule=Host(`demo.api.ch`) && PathPrefix(`/`)"
+      - "traefik.http.routers.apache_static.service=apache_static"
+      - "traefik.http.services.ajax.loadbalancer.sticky=true"
+      - "traefik.http.services.apache_static.loadbalancer.sticky.cookie.name=session"
+
+  express_dynamic:
+    image: api-dynamic
+    deploy:
+      replicas: 1
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.express_dynamic.rule=Host(`demo.api.ch`) && PathPrefix(`/pets/`)"
+      - "traefik.http.services.express_dynamic.loadbalancer.server.port=3000"
+      - "traefik.http.routers.express_dynamic.middlewares=express_dynamic-stripprefix"
+      - "traefik.http.middlewares.express_dynamic-stripprefix.stripprefix.prefixes=/pets/"
