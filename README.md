@@ -31,7 +31,9 @@ Nom des branches utilisées dans ce projet
     fb-dynamic-configuration
     
     
-    
+# Pré-avis
+
+Nous avons décidé de faire un repo chacune pour être sûre de bien comprendre la matière de ce cours. Ce repo est celui de Maëlle Vogel. Celui de Mélissa Gehring est visible à l'adresse: [https://github.com/Lollipoke/API-2021-HTTP-Infrastructure](https://github.com/Lollipoke/API-2021-HTTP-Infrastructure)
    
 
 # Partie 1 apache web static
@@ -44,7 +46,7 @@ En lisant la documentaton nous apercevons qu'il faut placer notre site dans le d
 
     COPY src/ /var/www/html/
 
-Finalement il faut build puis run le container pour voir notre site à l'adresse http://localhost:8080
+Finalement il faut build puis run le container pour voir notre site à l'adresse [http://localhost:8080](http://localhost:8080)
 
     docker build -t api-static .
     docker run -p 8080:80 -d --name api-static api-static
@@ -61,7 +63,7 @@ le dossier /opt/app ce que fait la COPY du Dockerfile une fois encore. La ligne 
 Notre script génére un liste d'animaux colorés à adopter. La couleur pourrait être récupéré pour être affiché mais par manque de temps nous n'avons pas pû le faire.
 La liste est renouvelé à chaque rafraîchissement de page.
 
-Finalement il faut build puis run le container pour voir notre site à l'adresse http://localhost:9090
+Finalement il faut build puis run le container pour voir notre site à l'adresse [http://localhost:9090](http://localhost:9090)
 
     docker build -t api-dynamic .
     docker run -p 9090:3000 -d --name api-dynamic api-dynamic
@@ -102,7 +104,7 @@ Une fois que le reverse proxy est configuré il n'y a plus besoin de mapper les 
     docker build -t api-rp .
     docker run -p 8080:80 -d --name api-rp api-rp
 
-Maintenant les deux sites sont visibles à l'adresse http://demo.api.ch:8080 et http://demo.api.ch:8080/api/students
+Maintenant les deux sites sont visibles à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080) et [http://demo.api.ch:8080/api/students](http://demo.api.ch:8080/api/students)
 
 # Partie 4 ajax
 
@@ -121,7 +123,7 @@ Nous utilisons -e pour mettre des arguments qui sont des valeurs de variables qu
 Le script apache2-foreground se lance au démarrage du container. C'est lui qui met le résulat du script php dans le fichie de configuration du reverse proxy. Après cela il faut relancer apache2 pour prendre en compte les modifications. Nous nous sommes basé sur le fichier pour notre version de php car celui de la vidéo n'est plus d'actualité.
 Lien du fichier pour notre version php: [php:7.2/apache2-foreground](https://github.com/docker-library/php/blob/fbba7966bc4ca30a8bb2482cd694a798a50f4406/7.2/buster/apache/apache2-foreground)
 
-Finalement on construit l'image puis on lance le container et les deux sites sont visibles à l'adresse http://demo.api.ch:8080 et http://demo.api.ch:8080/api/students
+Finalement on construit l'image puis on lance le container et les deux sites sont visibles à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080) et [http://demo.api.ch:8080/api/students](http://demo.api.ch:8080/api/students)
 
     docker build -t api-rp .
     docker run -d -e STATIC_APP=172.17.0.2:80 -e DYNAMIC_APP=172.17.0.3:3000 --name apache-rp -p 8080:80 api-rp
