@@ -109,16 +109,17 @@ Maintenant les deux sites sont visibles à l'adresse [http://demo.api.ch:8080](h
 # Partie 4 ajax
 
 Dans cette partie nous allons rajouté un script qui fera des requêtes pour afficher sur la page web les animaux colorés à adopter.
-Ce script prend le premier animal du flux JSON pour l'afficher dans une balise span html avec le nom de class skills. Il renouvelle cet animal toutes les 2 secondes.
-Le nom du script doit être placé en bas de la page html dans des balises script.
+Ce script prend le premier animal du flux JSON (du site dynamique réalisé à la partie 2) pour l'afficher dans une balise span html avec le nom de class skills. Il renouvelle cet animal toutes les 2 secondes.
+Le nom du script doit être placé en bas de la page html index.html dans des balises script.
 
+    <script src="student.js"></script>
 
 
 # Partie 5 configuration dynamique du reverse proxy
 
 Cette partie permet plus de flexibilté car l'adresse ip des deux containers est mis au moment de lancer le reverse proxy et non plus dans des fichiers de configuration.
 
-Nous utilisons -e pour mettre des arguments qui sont des valeurs de variables que le script php récupére pour mettre le fichier de configuration.
+Nous utilisons -e pour mettre des arguments qui sont des valeurs de variables que le script php récupére pour mettre dans le fichier de configuration.
 
 Le script apache2-foreground se lance au démarrage du container. C'est lui qui met le résulat du script php dans le fichie de configuration du reverse proxy. Après cela il faut relancer apache2 pour prendre en compte les modifications. Nous nous sommes basé sur le fichier pour notre version de php car celui de la vidéo n'est plus d'actualité.
 Lien du fichier pour notre version php: [php:7.2/apache2-foreground](https://github.com/docker-library/php/blob/fbba7966bc4ca30a8bb2482cd694a798a50f4406/7.2/buster/apache/apache2-foreground)
@@ -130,6 +131,25 @@ Finalement on construit l'image puis on lance le container et les deux sites son
 
 # Partie 6 étapes additionelles
 
+Nous avons mis en place du load-balancing et des sticky sessions à l'aide de docker-compose et traefik
+
 ## docker-compose
+
+Docker compose permet de décrire le fonctionnement de plusieurs services faisant partie du même projet. Un fichier docker-compose.yml à la racine du projet décrit les fonctionnement des différent services.
+
 ## traefik
+
+Nous avons pris une image Traefik pour replacer le reverse porxy réalisé à l'étape précèdente. Cela facilite le travail car traefik s'occupe de trouver les adresses des containers et les déploye selon les informations données dans la partie labels.
+
+Cette ligne permet de donner l'adresse du site et oũ il doit être placé. Ici se sera à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080). Le port est spécificé dans le service reverse-proxy.
+
+    - "traefik.http.routers.apache_static.rule=Host(`demo.api.ch`) && PathPrefix(`/`)"
+
+Pour le site dynamique il a fallu préciser sur quel port le script écoute.
+
+    - "traefik.http.services.express_dynamic.loadbalancer.server.port=3000"
+
+Le loadbalancing se fait avec cette ligne.
+
+    - "traefik.http.services.apache_static.loadbalancer.sticky=true"
 
