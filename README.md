@@ -128,3 +128,8 @@ Finalement on construit l'image puis on lance le container et les deux sites son
     docker build -t api-rp .
     docker run -d -e STATIC_APP=172.17.0.2:80 -e DYNAMIC_APP=172.17.0.3:3000 --name apache-rp -p 8080:80 api-rp
 
+# Partie 6 étapes additionelles
+
+## docker-compose
+## traefik
+
