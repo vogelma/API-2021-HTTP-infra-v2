@@ -2,14 +2,17 @@ $(function(){
     console.log("Loading pets to adopt");
 
     function loadPets(){
-        $.getJSON("/api/students/", function(pets) {
+        $.getJSON("/pets/", function(pets) {
             console.log(pets);
             var msg = "Nobody is here";
+            var color = "black";
             
             if(pets.length > 0){
-                msg = pets[0].animal + " "+ pets[0].color; 
+                msg = pets[0].animal;
+                color = pets[0].color;
             }
-        $(".skills").text(msg);
+        $(".pets").text(msg);
+        $(".pets").css('color', color);
         });
     };
 
