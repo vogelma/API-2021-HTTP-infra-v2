@@ -23,7 +23,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.apache_static.rule=Host(`demo.api.ch`) && PathPrefix(`/`)"
       - "traefik.http.routers.apache_static.service=apache_static"
-      - "traefik.http.services.ajax.loadbalancer.sticky=true"
+      - "traefik.http.services.apache_static.loadbalancer.sticky=true"
       - "traefik.http.services.apache_static.loadbalancer.sticky.cookie.name=session"
 
   express_dynamic:
