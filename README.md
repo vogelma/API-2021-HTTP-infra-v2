@@ -2,22 +2,22 @@
 
 ## Docker
 
-Build une image en lui donnant un nom
+Build une image en lui donnant le nom nameImage
 
     docker build -t nameImage .
 
-Run un container en mappant le port 80 sur le port de sortie 8080 et en donnant un nom au container
+Run un container en arrière plan, en mappant le port 80 du container sur le port 8080 de l'hôte, et en donnant le nom nameContainer au container
 
-    docker run -p 8080:80 --name nameContainer nameImage
+    docker run -d -p 8080:80 --name nameContainer nameImage
 
-Trouver l'adresse ip d'un container
+Trouver l'adresse ip du container nameContainer
 
     docker inspect nameContainer | grep -i ipaddr
 
 
 ## Git
 
-Création d'une nouvelle branche
+Création d'une nouvelle branche newBranch
 
     git checkout -b newBranch
 
@@ -29,27 +29,44 @@ Nom des branches utilisées dans ce projet
     fb-apache-reverse-proxy
     fb-ajax-jquery
     fb-dynamic-configuration
+    fb-traefik
     
     
 # Pré-avis
 
-Nous avons décidé de faire un repo chacune pour être sûre de bien comprendre la matière de ce cours. Ce repo est celui de Maëlle Vogel. Celui de Mélissa Gehring est visible à l'adresse: [https://github.com/Lollipoke/API-2021-HTTP-Infrastructure](https://github.com/Lollipoke/API-2021-HTTP-Infrastructure)
+Nous avons décidé de faire un repo chacune et de travailler chacune sur le sien en parallèle pour être sûre de bien comprendre la matière de ce cours. Ce repo est celui de Maëlle Vogel. Celui de Mélissa Gehring est visible à l'adresse: [https://github.com/Lollipoke/API-2021-HTTP-Infrastructure](https://github.com/Lollipoke/API-2021-HTTP-Infrastructure).
    
 
-# Partie 1 apache web static
+# Architecture du repo
 
-Pour cette première partie il était nécessaire de créer un site web static. Nous avons utilisé un template de bootstrap pour avoir une interface user-friendly.
-Nous voulions ensuite que le site soit accesible en localhost pour cela nous nous sommes aidé de Docker qui fournit une image php avec apache intégré.
-En lisant la documentaton nous apercevons qu'il faut placer notre site dans le dossier /var/www/html de l'image. La ligne COPY du Dockerfile s'en occupe.
+La branche main contient uniquement le fichier README.md, et nous avons ensuite créé une nouvelle branche pour chaque nouvelle partie. Chaque checkout a été fait à partir de la branche actuelle, et non pas à partir de la branche main, de sorte que la branche de la partie n+1 contient également le travail réalisé dans la partie n.
+Les fichiers nécessaires aux 3 principales images sont séparés en 3 dossiers, stockés dans le dossier docker_images.
+
+
+# Partie 1 : Serveur HTTP statique avec apache httpd (fb-apache-static)
+
+Pour cette première partie il nous était demandé de créer un site web static. Pour le contenu de notre page web, nous avons utilisé un template de bootstrap afin d'avoir une interface user-friendly.
+Afin de lancer un serveur HTTP générant notre page statique à partir du contenu de notre template, accessible en localhost, nous avons utilisé l'image docker officielle php avec apache intégré.
+La documentation de l'image officielle php nous indique le contenu à insérer dans le Dockerfile :
 
     FROM php:7.2-apache
 
     COPY src/ /var/www/html/
 
-Finalement il faut build puis run le container pour voir notre site à l'adresse [http://localhost:8080](http://localhost:8080)
+Nous observons que le contenu du dossier src/ est copié à l'emplacement /var/www/html/, car c'est à cet endroit que se situe l'arborescence de notre file system HTML dans l'image Docker. Nous avons donc naturellement inséré notre template dans notre dossier src/ local qui se situe au même niveau que le Dockerfile, afin qu'il soit copié au bon endroit au moment de la création de l'image.
 
-    docker build -t api-static .
-    docker run -p 8080:80 -d --name api-static api-static
+Finalement, nous pouvons build notre image :
+
+    docker build -t api/api-static .
+
+Puis run le container :
+
+    docker run -p 8080:80 -d --name api-static api/api-static    
+
+Pour voir notre site à l'adresse [http://localhost:8080](http://localhost:8080)
+
+Note : en exécutant la commande /bin/bash sur notre container api-static en train de tourner, nous pouvons aller observer les fichiers de configuration du serveur apache. Ils se trouvent dans le dossier /etc/apache2/. On y trouve, entre autres, le fichier de configuration principal apache2.conf, ou encore la liste des fichiers de configuration pour plusieurs sites potentiels, situés dans le dossier sites-available. Cela nous sera utile pour les étapes ultérieures.
+
 
 # Partie 2 express web dynamic
 
