@@ -139,27 +139,41 @@ Les deux dernières commandes du Dockerfile permettent d'activer les modules pro
 Pour pouvoir tester notre infrastructure sur un navigateur web, il faut faire en sorte que le navigateur envoie le bon Host dans la requête. Pour cela il faut configurer le DNS. Sous Debian 11 il faut mapper localhost vers le Host, ici demo.api.ch, dans le fichier /etc/hosts. Sous Windows, il faut modifier le fichier C:\Windows\System32\drivers\etc\hosts.
 
     127.0.0.1 demo.api.ch
+    
+Une fois que nous avons fait tous ces ajouts, nous pouvons créer l'image api/api-rp en allant nous placer dans le dossier docker-files/apache-reverse-proxy/ et en lançant la commande :
+
+    docker build -t api/api-rp .
 
 Une fois que le reverse proxy est configuré il n'y a plus besoin de mapper les ports pour les services, comme mentionné plus haut, car apache s'occupe de le rediriger en sortant du docker. En démarrant la procédure de 0, sans aucun container en cours d'exécution, les commandes suivantes permettent de mettre en place les 2 containers de services ainsi que le reverse-proxy :
 
     docker run -d --name api-static api/api-static
     docker run -d --name api-dynamic api/api-dynamic
-
-    docker build -t api/api-rp .
     docker run -p 8080:80 -d --name api-rp api/api-rp
 
 Maintenant les deux sites sont visibles aux adresses [http://demo.api.ch:8080](http://demo.api.ch:8080) et [http://demo.api.ch:8080/pets/](http://demo.api.ch:8080/pets/)
 
 Note : Ce setup est très fragile car les adresses IP sont hardcodées dans le fichier de configuration, et il faut toujours s'assurer de démarrer la procédure avec aucun container en cours d'exécution, et d'exécuter les commander run dans le bon ordre.
 
-# Partie 4 ajax
+# Partie 4 : Requêtes AJAX avec JQuery (fb-ajax-jquery)
 
-Dans cette partie nous allons rajouté un script qui fera des requêtes pour afficher sur la page web statique les animaux colorés à adopter.
-Ce script prend le premier animal du flux JSON (du site dynamique réalisé à la partie 2) pour l'afficher dans une balise span html avec le nom de class pets. Le nom de l'animal est affiché dans sa couleur. Il renouvelle cet animal toutes les 2 secondes.
-Le nom du script doit être placé en bas de la page html index.html dans des balises script.
+Pour faire nos requêtes AJAX, nous avons utilisé la librairie Javascript JQuery. Depuis notre browser, on envoie des requêtes (AJAX) en arrière-plan au serveur dynamique pour récupérer des données : les paires d'animaux colorés. A partir de ces données on va mettre à jour notre site web statique afin d'afficher le nom du premier animal dans la couleur correspondante, si la requête nous renvoie au moins une paire d'animaux colorés.
 
-    <script src="student.js"></script>
+Dans cette partie nous avons donc modifié le dossier src de notre partie 1, pour y ajouter un script Javascript qui fera les requêtes mentionnées ci-dessus. Il prend le premier animal du flux JSON (du site dynamique réalisé à la partie 2 qui se trouve à l'adresse /pets/) pour l'afficher dans une balise span HTML avec le nom de class pets que nous avons ajoutée pour le bien de notre démo dans le fichier index.html. Le nom de l'animal est affiché dans sa couleur. Le script refait une nouvelle requête automatiqmenet toutes les 2 secondes.
+Le nom du script doit également être ajouté en bas de la page HTML index.html dans des balises script :
 
+    <script src="pets.js"></script>
+    
+Une fois que nous avons fait tous ces ajouts, nous pouvons recréer l'image api/api-static en allant nous placer dans le dossier docker-files/apache-php-image/ et en lançant la commande :
+
+    docker build -t api/api-static .
+
+Finalement, de manière similaire à la partie 3, nous pouvons tester notre infrastructure en suivant la procédure suivante, en assumant qu'aucun container n'est en cours d'exécution :
+    
+    docker run -d --name api-static api/api-static
+    docker run -d --name api-dynamic api/api-dynamic
+    docker run -p 8080:80 -d --name api-rp api/api-rp
+    
+Et nous pouvons admirer le resultat à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080).
 
 # Partie 5 configuration dynamique du reverse proxy
 
