@@ -209,27 +209,203 @@ Et introduire finalement le résultat dans les variables d'environnement en lan�
     
 Et nous pouvons admirer le resultat à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080).
 
-# Partie 6 étapes additionelles
+# Partie 6 : Étapes additionnelles (fb-traefik)
 
-Nous avons mis en place du load-balancing et des sticky sessions à l'aide de docker-compose et traefik
+Afin de compléter et d'améliorer notre infrastructure, nous avons décidé de mettre en place du load-balancing entre plusieurs containers pour chaque service, la gestion d'un cluster dynamique et de sticky sessions. Pour cela, nous avons utilisé le reverse-proxy fourni par Traefik. Traefik permet très simplement d'implémenter ces 3 fonctionnalités, le tout à l'aide de docker-compose. Finalement nous avons également ajouté la gestion graphique de notre infrastructure et de nos services à l'aide de Portainer, que nous avons également ajouté via docker-compose. 
 
 ## docker-compose
 
-Docker compose permet de décrire le fonctionnement de plusieurs services faisant partie du même projet. Un fichier docker-compose.yml à la racine du projet décrit les fonctionnement des différent services.
+Docker-compose permet de décrire la structure des services à ajouter dans un projet, et de les lancer via une seule commande docker-compose up, ou de les stopper via la commande docker-compose down.
+Un fichier docker-compose.yml à la racine du projet décrit les fonctionnement des différents services dont nous aurons besoin pour implémenter notre infrastructure finale.
 
-## traefik
+## Traefik
 
-Nous avons pris une image Traefik pour replacer le reverse porxy réalisé à l'étape précèdente. Cela facilite le travail car traefik s'occupe de trouver les adresses des containers et les déploye selon les informations données dans la partie labels.
+Là où notre reverse-proxy apache avait besoin d'un fichier de configuration contenant tous les chemins possibles vers nos serveurs (le fichier 001-reverse-proxy.conf), Traefik lui récupère le bon serveur directement en allant chercher l'information fournie par des providers. Au moment de déployer les serveurs, décrits dans le docker-compose, on attache une information qui indique à Traefik les caractéristiques des requêtes que le serveur peut gérer. Dans notre infrastructure, ces informations correspondent au Host 'demo.api.ch', et au path '/' pour notre serveur statique, et '/pets/' pour notre serveur dynamique. Dans le cas du provider Docker, Traefik récupère ces informations via l'utilisation de labels.
 
-Cette ligne permet de donner l'adresse du site et oũ il doit être placé. Ici se sera à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080). Le port est spécificé dans le service reverse-proxy.
+Dans notre fichier docker-compose.yml, nous avons donc décrits 4 services. 
 
-    - "traefik.http.routers.apache_static.rule=Host(`demo.api.ch`) && PathPrefix(`/`)"
+Le premier concerne le reverse-proxy. Pour cela nous utilisons l'image Traefik officielle, la version 2.5. Nous déclarons que Docker est un provider, et nous mappons les ports suivants : 9090:80 pour notre site web, et 8080:8080 pour le dashboard Traefik.
 
-Pour le site dynamique il a fallu préciser sur quel port le script écoute.
+Le deuxième concerne le serveur web static. L'option build permet de reconstruire l'image à chaque fois que nous lançons le docker-compose, sans avoir à se soucier de recréer les images à la main. Nous déployons directement 3 serveurs différents :
 
-    - "traefik.http.services.express_dynamic.loadbalancer.server.port=3000"
+    deploy:
+      replicas: 3
 
-Le loadbalancing se fait avec cette ligne.
+et à l'aide de labels nous indiquons à Traefik que le service est accessible par l'Host 'demo.api.ch' via le path '/'. 
 
-    - "traefik.http.services.apache_static.loadbalancer.sticky=true"
+     - "traefik.http.routers.apache.rule=PathPrefix(`/`) && Host(`demo.api.ch`)"
 
+Nous activons également l'utilisation de sticky sessions via les labels, et leur utilisation est décrite dans la section correspondante plus bas.
+
+     - "traefik.http.services.apache.loadbalancer.sticky=true"
+     - "traefik.http.services.apache.loadbalancer.sticky.cookie.name=cookie"
+
+Le 3ème service concerne le serveur dynamique qui génère les animaux colorés. A nouveau nous déployons 2 serveurs différents, et nous indiquons que le service est accessible par l'Host 'demo.api.ch' via le path '/pets/'. Nous précisons également que le port du service est le 3000.
+
+      - "traefik.http.services.express.loadbalancer.server.port=3000"
+      - "traefik.http.routers.express.rule=PathPrefix(`/pets/`) && Host(`demo.api.ch`)"
+      
+Nous utilisons un middleware afin de redigirer les requêtes AJAX.
+      
+      - "traefik.http.routers.express.middlewares=express-replacepath"
+      - "traefik.http.middlewares.express-replacepath.replacepath.path=/"
+      
+Le dernier service, portainer, est décrit dans la section correspondante plus bas.
+
+Après l'exécution de 
+
+    docker-compose up -d
+    
+L'option -d permet de lancer les services en arrière plan. 
+
+On peut alors observer notre magnifique site web statique à l'adresse [http://demo.api.ch:9090](http://demo.api.ch:9090).
+
+### Dynamic cluster
+
+La gestion dynamique des serveurs des différents services est gérée automatiquement par Traefik. Pour s'en convaincre, nous pouvons réaliser la manipulation suivante.
+
+A la racine de notre projet, où se trouve le fichier docker-compose.yml, nous pouvons lancer notre infrastructure à l'aide de la commande :
+    
+    docker-compose up -d
+    
+Un docker ps nous permet de voir que 7 containers sont en cours d'exécution. 1 pour le reverse-proxy, 1 pour portainer, 3 pour le service web statique, et 2 pour le service Javascript dynamique. Si on scale le nombre de serveurs pour le service web statique, par exemple : 
+
+    docker-composer up --scale apache_static=5
+
+On peut remarquer après un nouveau docker ps que désormais 9 containers sont en cours d'exécution, et le site web statique [http://demo.api.ch:9090](http://demo.api.ch:9090) est toujours accessible et fonctionnel. 
+
+Un petit tour sur le [dashboard Traefik](http://demo.api.ch:8080/dashboard/#/) nous aurait également permis d'observer l'ajout dynamique des containers.
+
+### Load-balancing
+
+Comme pour la gestion dynamique des serveurs, le load-balancing est géré automatiquement par Traefik. Pour s'en convaincre, nous pouvons réaliser la manipulation suivante.
+
+Lançons notre infrastructure en premier-plan cette fois-ci, afin d'avoir accès directement aux logs dans la console.
+
+    docker-compose up
+    
+Lorsque l'on accède à notre site web statique, nous pouvons alors observer dans la console que les requêtes AJAX sont bien réparties entre les deux noeuds du service express_dynamic. Chaque serveur reçoit une requête sur deux.
+
+    express_dynamic_1  | 8
+    express_dynamic_1  | [
+    express_dynamic_1  |   { animal: 'Cotton Rat', color: '#31acc1' },
+    express_dynamic_1  |   { animal: 'Geckos', color: '#c239a6' },
+    express_dynamic_1  |   { animal: 'Collared Lemur', color: '#d36c21' },
+    express_dynamic_1  |   { animal: 'Carp', color: '#e221ad' },
+    express_dynamic_1  |   { animal: 'Pig', color: '#f25c5a' },
+    express_dynamic_1  |   { animal: 'Bushshrike', color: '#89b61e' },
+    express_dynamic_1  |   { animal: 'American Bison', color: '#000028' },
+    express_dynamic_1  |   { animal: 'Pig', color: '#11ad92' }
+    express_dynamic_1  | ]
+    
+    express_dynamic_2  | 1
+    express_dynamic_2  | [ { animal: 'Tan Bristlemouth', color: '#97ccd2' } ]
+    
+    express_dynamic_1  | 2
+    express_dynamic_1  | [
+    express_dynamic_1  |   { animal: 'Vigtorniella Worm', color: '#1c0e24' },
+    express_dynamic_1  |   { animal: 'Pigs and Hogs', color: '#f6c066' }
+    express_dynamic_1  | ]
+    
+    express_dynamic_2  | 1
+    express_dynamic_2  | [ { animal: 'Kangaroo Rat', color: '#69ab43' } ]
+
+Ce qui prouve que Traefik s'occupe du load-balancing.
+
+### Sticky sessions
+
+Pour la gestion des sticky sessions pour notre serveur web statique, nous avons du ajouter les labels suivants :
+
+     - "traefik.http.services.apache.loadbalancer.sticky=true"
+     - "traefik.http.services.apache.loadbalancer.sticky.cookie.name=cookie"
+     
+Ainsi, nous avons un cookie nommé 'cookie' qui permet à Traefik de determiner vers quel container diriger la requête si plusieurs requêtes ont lieu durant la même session. 
+Si on lance notre infrastructure en premier plan, qu'on accède au site web statique, et qu'on rafraîchit la page plusieurs fois, on observe que c'est toujours le même serveur qui nous répond. Si on lance ensuite une fenêtre en navigation privée, qui n'envoie pas de cookies, nous observons que la requête est distribuée vers un autre serveur, et ainsi de suite en suivant un ordre en round-robin.
+
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:44 +0000] "GET / HTTP/1.1" 200 1132 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:44 +0000] "GET /css/3-col-portfolio.css HTTP/1.1" 200 568 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:44 +0000] "GET /pets.js HTTP/1.1" 200 556 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:44 +0000] "GET /vendor/bootstrap/css/bootstrap.min.css HTTP/1.1" 200 21375 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:44 +0000] "GET /vendor/jquery/jquery.min.js HTTP/1.1" 200 30611 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:44 +0000] "GET /vendor/bootstrap/js/bootstrap.bundle.min.js HTTP/1.1" 200 20993 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:44 +0000] "GET /favicon.ico HTTP/1.1" 404 436 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    express_dynamic_1  | 4
+    express_dynamic_1  | [
+    express_dynamic_1  |   { animal: 'Toad', color: '#346063' },
+    express_dynamic_1  |   { animal: 'Copperhead', color: '#0571a8' },
+    express_dynamic_1  |   { animal: 'Chinchillas', color: '#b069c9' },
+    express_dynamic_1  |   { animal: 'Red Panda', color: '#84151e' }
+    express_dynamic_1  | ]
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:45 +0000] "GET / HTTP/1.1" 200 1132 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    express_dynamic_2  | 4
+    express_dynamic_2  | [
+    express_dynamic_2  |   { animal: 'Aldabra Tortoise', color: '#79dcda' },
+    express_dynamic_2  |   { animal: 'Rhea', color: '#84d4c5' },
+    express_dynamic_2  |   { animal: 'Frog', color: '#b44425' },
+    express_dynamic_2  |   { animal: 'Mice', color: '#ee2477' }
+    express_dynamic_2  | ]
+    express_dynamic_1  | 2
+    express_dynamic_1  | [
+    express_dynamic_1  |   { animal: 'White-throated Bee Eater', color: '#553552' },
+    express_dynamic_1  |   { animal: 'Coati', color: '#971f85' }
+    express_dynamic_1  | ]
+    apache_static_1    | 192.168.176.7 - - [17/Jan/2022:19:03:48 +0000] "GET / HTTP/1.1" 200 1132 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    express_dynamic_2  | 5
+    express_dynamic_2  | [
+    express_dynamic_2  |   { animal: 'Glowing Sucker Octopus', color: '#a6d5e4' },
+    express_dynamic_2  |   { animal: 'Python', color: '#405463' },
+    express_dynamic_2  |   { animal: 'White-throated Bee Eater', color: '#7d181b' },
+    express_dynamic_2  |   { animal: 'Bass', color: '#a1cfb4' },
+    express_dynamic_2  |   { animal: 'Lion', color: '#596ecc' }
+    express_dynamic_2  | ]
+    express_dynamic_1  | 2
+    express_dynamic_1  | [
+    express_dynamic_1  |   { animal: 'Horseshoe Crab', color: '#d294c2' },
+    express_dynamic_1  |   { animal: 'Little Penguin', color: '#559db1' }
+    express_dynamic_1  | ]
+    apache_static_2    | 192.168.176.7 - - [17/Jan/2022:19:03:53 +0000] "GET / HTTP/1.1" 200 1132 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_2    | 192.168.176.7 - - [17/Jan/2022:19:03:53 +0000] "GET /vendor/bootstrap/css/bootstrap.min.css HTTP/1.1" 200 21375 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_2    | 192.168.176.7 - - [17/Jan/2022:19:03:53 +0000] "GET /css/3-col-portfolio.css HTTP/1.1" 200 568 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_2    | 192.168.176.7 - - [17/Jan/2022:19:03:53 +0000] "GET /pets.js HTTP/1.1" 200 556 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_2    | 192.168.176.7 - - [17/Jan/2022:19:03:53 +0000] "GET /vendor/bootstrap/js/bootstrap.bundle.min.js HTTP/1.1" 200 20993 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_2    | 192.168.176.7 - - [17/Jan/2022:19:03:53 +0000] "GET /vendor/jquery/jquery.min.js HTTP/1.1" 200 30611 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    express_dynamic_2  | 1
+    express_dynamic_2  | [ { animal: 'Donkey', color: '#4c3630' } ]
+    express_dynamic_1  | 5
+    express_dynamic_1  | [
+    express_dynamic_1  |   { animal: 'Toad', color: '#969f73' },
+    express_dynamic_1  |   { animal: 'Sawfish', color: '#fc14ba' },
+    express_dynamic_1  |   { animal: 'Hawaiian Monk Seal', color: '#736df5' },
+    express_dynamic_1  |   { animal: 'Icefish', color: '#1c13a4' },
+    express_dynamic_1  |   { animal: 'Cownose Ray', color: '#264e9b' }
+    express_dynamic_1  | ]
+    express_dynamic_2  | 2
+    express_dynamic_2  | [
+    express_dynamic_2  |   { animal: 'Blue Iguana', color: '#3f0bbb' },
+    express_dynamic_2  |   { animal: 'Dogs', color: '#27d8eb' }
+    express_dynamic_2  | ]
+    apache_static_3    | 192.168.176.7 - - [17/Jan/2022:19:04:09 +0000] "GET / HTTP/1.1" 200 1132 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_3    | 192.168.176.7 - - [17/Jan/2022:19:04:09 +0000] "GET /vendor/bootstrap/css/bootstrap.min.css HTTP/1.1" 200 21375 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_3    | 192.168.176.7 - - [17/Jan/2022:19:04:09 +0000] "GET /css/3-col-portfolio.css HTTP/1.1" 200 568 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_3    | 192.168.176.7 - - [17/Jan/2022:19:04:09 +0000] "GET /pets.js HTTP/1.1" 200 556 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_3    | 192.168.176.7 - - [17/Jan/2022:19:04:09 +0000] "GET /vendor/bootstrap/js/bootstrap.bundle.min.js HTTP/1.1" 200 20993 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    apache_static_3    | 192.168.176.7 - - [17/Jan/2022:19:04:09 +0000] "GET /vendor/jquery/jquery.min.js HTTP/1.1" 200 30611 "http://demo.api.ch:9090/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36"
+    express_dynamic_1  | 10
+    express_dynamic_1  | [
+    express_dynamic_1  |   { animal: 'Badger', color: '#8c6727' },
+    express_dynamic_1  |   { animal: 'Sand Cat', color: '#84d9ff' },
+    express_dynamic_1  |   { animal: 'Badger', color: '#40aa9d' },
+    express_dynamic_1  |   { animal: 'Guinea', color: '#4708a9' },
+    express_dynamic_1  |   { animal: 'Macaw', color: '#d9294d' },
+    express_dynamic_1  |   { animal: 'Acantharea', color: '#b9a739' },
+    express_dynamic_1  |   { animal: 'Horse', color: '#629e7c' },
+    express_dynamic_1  |   { animal: 'Guinea Fowl', color: '#a149f4' },
+    express_dynamic_1  |   { animal: 'Toad', color: '#e1bc93' },
+    express_dynamic_1  |   { animal: 'Gerbils', color: '#48e705' }
+    express_dynamic_1  | ]
+
+Ce qui nous montre bien l'utilisation de sticky sessions.
+
+## Portainer
+
+Finalement, nous avons ajouté un service portainer à notre docker-compose, exposé sur le port 9000 et donc accessible à l'adresse [http://demo.api.ch:9000](http://demo.api.ch:9000), afin de pouvoir gérer l'ajout / la suppression de container via une interface graphique intuitive. Nous n'avons malheureusement pas eu le temps d'intégrer portainer à notre reverse-proxy. Il serait intéressant dans le futur d'intégrer également un système de cookies afin de récupérer l'authentification, pour ne plus avoir à recréer un profil à chaque nouvelle utilisation.
