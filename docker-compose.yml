@@ -2,37 +2,36 @@ version: '3'
 
 services:
   reverse-proxy:
-    # The official v2 Traefik docker image
     image: traefik:v2.5
-    # Enables the web UI and tells Traefik to listen to docker
     command: --providers.docker --api.insecure=true
     ports:
-      # The HTTP port
       - "9090:80"
-      # The Web UI (enabled by --api.insecure=true)
       - "8080:8080"
     volumes:
-      # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock
 
   apache_static:
-    image: api-static
+    build: ./docker_images/apache-php-image/.
     deploy:
-      replicas: 1
+      replicas: 3
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.apache_static.rule=Host(`demo.api.ch`) && PathPrefix(`/`)"
-      - "traefik.http.routers.apache_static.service=apache_static"
-      - "traefik.http.services.apache_static.loadbalancer.sticky=true"
-      - "traefik.http.services.apache_static.loadbalancer.sticky.cookie.name=session"
+     - "traefik.http.routers.apache.rule=PathPrefix(`/`) && Host(`demo.api.ch`)"
+     - "traefik.http.services.apache.loadbalancer.sticky=true"
+     - "traefik.http.services.apache.loadbalancer.sticky.cookie.name=cookie"
 
   express_dynamic:
-    image: api-dynamic
+    build: ./docker_images/express-image/.
     deploy:
-      replicas: 1
+      replicas: 2
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.express_dynamic.rule=Host(`demo.api.ch`) && PathPrefix(`/pets/`)"
-      - "traefik.http.services.express_dynamic.loadbalancer.server.port=3000"
-      - "traefik.http.routers.express_dynamic.middlewares=express_dynamic-stripprefix"
-      - "traefik.http.middlewares.express_dynamic-stripprefix.stripprefix.prefixes=/pets/"
+      - "traefik.http.services.express.loadbalancer.server.port=3000"
+      - "traefik.http.routers.express.rule=PathPrefix(`/pets/`) && Host(`demo.api.ch`)"
+      - "traefik.http.routers.express.middlewares=express-replacepath"
+      - "traefik.http.middlewares.express-replacepath.replacepath.path=/"
+
+  portainer:
+    image: portainer/portainer-ce
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
