@@ -34,7 +34,7 @@ Nom des branches utilisées dans ce projet
     
 # Pré-avis
 
-Nous avons décidé de faire un repo chacune et de travailler chacune sur le sien en parallèle pour être sûre de bien comprendre la matière de ce cours. Ce repo est celui de Maëlle Vogel. Celui de Mélissa Gehring est visible à l'adresse: [https://github.com/Lollipoke/API-2021-HTTP-Infrastructure](https://github.com/Lollipoke/API-2021-HTTP-Infrastructure).
+Nous avons décidé de faire un repo chacune et de travailler chacune sur le sien en parallèle pour être sûre de bien comprendre la matière de ce cours. Ce repo est celui de Maëlle Vogel. Celui de Mélissa Gehring est visible à l'adresse: [https://github.com/Lollipoke/API-2021-HTTP-Infrastructure](https://github.com/Lollipoke/API-2021-HTTP-Infrastructure). Nous avons décidé arbitrairement d'ajouter notre rapport sur ce repo-là, et c'est également celui-là que nous soumettons pour la note.
    
 
 # Architecture du repo
@@ -45,7 +45,7 @@ Les fichiers nécessaires aux 3 principales images sont séparés en 3 dossiers,
 
 # Partie 1 : Serveur HTTP statique avec apache httpd (fb-apache-static)
 
-Pour cette première partie il nous était demandé de créer un site web static. Pour le contenu de notre page web, nous avons utilisé un template de bootstrap afin d'avoir une interface user-friendly.
+Pour cette première partie il nous était demandé de créer un site web static. Pour le contenu de notre page web, nous avons utilisé un template de bootstrap pour avoir une interface user-friendly.
 Afin de lancer un serveur HTTP générant notre page statique à partir du contenu de notre template, accessible en localhost, nous avons utilisé l'image docker officielle php avec apache intégré.
 La documentation de l'image officielle php nous indique le contenu à insérer dans le Dockerfile :
 
