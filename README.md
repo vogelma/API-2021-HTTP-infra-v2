@@ -101,22 +101,25 @@ Puis run le container :
 
 Pour voir notre site à l'adresse [http://localhost:9090](http://localhost:9090)
 
-# Partie 3 reverse proxy
+# Partie 3 : Reverse proxy avec apache, configuration statique (fb-apache-reverse-proxy)
 
-Pour cette partie nous allons réutilisé les containers créés dans les deux premières partie. Pour commencer il faut trouver l'adresse ip de chacun avec
-la commande donné dans le webcast:
+Pour cette partie nous allons réutiliser les images créées dans les deux premières parties pour nos deux services, et ajouter un reverse proxy réalisé à l'aide d'un serveur apache afin de centraliser nos requêtes. 
+Tout d'abord il nous faut relancer deux containers, un pour chacun de nos service, en prenant soin de ne PAS les mapper vers l'extérieur avec l'option -p. L'intérêt du reverse proxy est justement de gérer les requêtes vers les différents services en interne. 
+Un fois nos containers lancés à l'aide de :
+
+    docker run -d --name api-static api/api-static 
+    docker run -d --name api-dynamic api/api-dynamic 
+    
+Nous avons pu trouver l'adresse ip de chacun avec la commande donnée dans le webcast:
 
     docker inspect nameContainer | grep -i ipaddr
 
 Pour notre infrastructure nous avons trouvé les adresses:
 
-ip pour le container php-web-static: 172.17.0.2
+    ip pour le container api-static: 172.17.0.2
+    ip pour le container api-dynamic: 172.17.0.3
 
-ip pour le container js-web-dynamic: 172.17.0.3
-
-La config pour les sites sont diponible dans le fichier conf/sites-available/001-reverse-proxy.conf. Le site statique est à la racine du site et le site dynamique avec le flux json est à l'adresse /api/students/.
-
-Nous utilisé la même image de base que pour la partie 1 mais nous mettons les fichiers dans le dossier d'Apache. Nous activons deux plugins puis nous activons notre site.
+Maintenant que nous avons nos deux services, il nous faut configurer le reverse-proxy. Pour cela nous avons utilisé la même image Docker php avec apache que dans la partie 1, et nous avons remplacé dans le Dockerfile la copie du dossier src/ contenant le template de la page web statique par la copie du dossier conf/ qui contient les fichiers de configuration du reverse proxy. 
 
     FROM php:7.2-apache
 
@@ -125,19 +128,29 @@ Nous utilisé la même image de base que pour la partie 1 mais nous mettons les 
     RUN a2enmod proxy proxy_http
     RUN a2ensite 000-* 001-*
 
-Sous Debian 11 il faut utiliser localhost pour mapper le domaine dans le fichier /etc/hosts. Nous avons utilisé demo.api.ch pour le nom de domaine.
+Comme mentionné dans la partie 1, ces fichiers de configuration se trouvent dans l'image dans le dossier /etc/apache2. 
+
+Nous avons rédigé le fichier de configuration en local dans le dossier conf. La config pour le reverse-proxy est diponible dans le fichier conf/sites-available/001-reverse-proxy.conf. Nous précisons que l'Host doit être demo.api.ch à l'aide de ServerName, puis à l'aide des commandes ProxyPass et ProxyPassReverse, nous indiquons à notre proxy que le site statique (adresse ip 172.0.7.2:80) est à la racine du site, "/", et que le site dynamique avec le flux json (adresse ip 172.0.7.3:3000) est à l'adresse "/pets/".
+
+Nous avons également fourni un site par défaut, décrit par le fichier de configuration 000-default.conf. Il est important de fournir un site par défaut, afin de rerouter les demandes qui ne précisent pas de Host vers ce dernier. Sinon, les demandes sans Host seraient aussi redirigées vers notre reverse-proxy, or nous voulons uniquement les demandes adressées au Host demo.api.ch.
+
+Les deux dernières commandes du Dockerfile permettent d'activer les modules proxy et proxy_http, afin de permettre l'utilisation de ProxyPass et ProxyPassReverse, puis d'activer les deux sites décrits dans les fichiers de configuration ci-dessus, afin qu'ils se retrouvent dans le dossier /etc/apache2/sites-enabled.
+
+Pour pouvoir tester notre infrastructure sur un navigateur web, il faut faire en sorte que le navigateur envoie le bon Host dans la requête. Pour cela il faut configurer le DNS. Sous Debian 11 il faut mapper localhost vers le Host, ici demo.api.ch, dans le fichier /etc/hosts. Sous Windows, il faut modifier le fichier C:\Windows\System32\drivers\etc\hosts.
 
     127.0.0.1 demo.api.ch
 
-Une fois que le reverse proxy est configuré il n'y a plus besoin de mapper les ports car apache s'occupe de le rediriger en sortant du docker.
+Une fois que le reverse proxy est configuré il n'y a plus besoin de mapper les ports pour les services, comme mentionné plus haut, car apache s'occupe de le rediriger en sortant du docker. En démarrant la procédure de 0, sans aucun container en cours d'exécution, les commandes suivantes permettent de mettre en place les 2 containers de services ainsi que le reverse-proxy :
 
-    docker run -d --name api-static api-static
-    docker run -d --name api-dynamic api-dynamic
+    docker run -d --name api-static api/api-static
+    docker run -d --name api-dynamic api/api-dynamic
 
-    docker build -t api-rp .
-    docker run -p 8080:80 -d --name api-rp api-rp
+    docker build -t api/api-rp .
+    docker run -p 8080:80 -d --name api-rp api/api-rp
 
-Maintenant les deux sites sont visibles à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080) et [http://demo.api.ch:8080/pets/](http://demo.api.ch:8080/pets/)
+Maintenant les deux sites sont visibles aux adresses [http://demo.api.ch:8080](http://demo.api.ch:8080) et [http://demo.api.ch:8080/pets/](http://demo.api.ch:8080/pets/)
+
+Note : Ce setup est très fragile car les adresses IP sont hardcodées dans le fichier de configuration, et il faut toujours s'assurer de démarrer la procédure avec aucun container en cours d'exécution, et d'exécuter les commander run dans le bon ordre.
 
 # Partie 4 ajax
 
