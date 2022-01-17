@@ -198,12 +198,12 @@ Puis, de manière similaire aux parties 3 et 4, nous pouvons tester notre infras
     docker run -d --name api-static api/api-static
     docker run -d --name api-dynamic api/api-dynamic
     
-Un fois ces deux service lancés, nous pouvons trouver leur adresse ip avec :
+Un fois ces deux services lancés, nous pouvons trouver leur adresse ip avec :
 
     docker inspect api-static | grep -i ipaddr
     docker inspect api-dynamic | grep -i ipaddr
 
-Et introduire finalement le résultat dans les variables d'environnements : 
+Et introduire finalement le résultat dans les variables d'environnement en lançant le container api-rp : 
 
     docker run -d -e STATIC_APP=172.17.0.2:80 -e DYNAMIC_APP=172.17.0.3:3000 --name api-rp -p 8080:80 api/api-rp
     
