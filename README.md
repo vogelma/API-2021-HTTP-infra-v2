@@ -175,19 +175,39 @@ Finalement, de manière similaire à la partie 3, nous pouvons tester notre infr
     
 Et nous pouvons admirer le resultat à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080).
 
-# Partie 5 configuration dynamique du reverse proxy
+# Partie 5 : Reverse proxy avec apache, configuration dynamique (fb-dynamic-configuration)
 
-Cette partie permet plus de flexibilté car l'adresse ip des deux containers est mis au moment de lancer le reverse proxy et non plus dans des fichiers de configuration.
+Un des problèmes fondamentaux avec notre infrastructure telle que nous l'avons laissée à la fin de la partie 4, est le fait que nous avons codé "en dur" les adresses IP dans le fichier de configuration de notre reverse proxy. Cette solution, bien que fonctionnelle sous certaines conditions, est non seulement peu élégante, mais surtout extrêmement fragile. En effet, elle implique de lancer les containers dans un ordre précis et nécessite de vérifier à la main que les adresses IP attribuées aux containers sont bien celles auxquelles on s'attend. Rien ne nous garantit qu'elles seront effectivement les bonnes !
 
-Nous utilisons -e pour mettre des arguments qui sont des valeurs de variables que le script php récupére pour mettre dans le fichier de configuration.
+Cette partie 5 nous permet donc de corriger ce problème en introduisant plus de flexibilté, car l'adresse ip des deux containers sera fournie dynamiquement au moment du lancement du reverse proxy, via l'utilisation de variables d'environnement, et non plus statiquement dans des fichiers de configuration.
 
-Le script apache2-foreground se lance au démarrage du container. C'est lui qui met le résulat du script php dans le fichie de configuration du reverse proxy. Après cela il faut relancer apache2 pour prendre en compte les modifications. Nous nous sommes basé sur le fichier pour notre version de php car celui de la vidéo n'est plus d'actualité.
-Lien du fichier pour notre version php: [php:7.2/apache2-foreground](https://github.com/docker-library/php/blob/fbba7966bc4ca30a8bb2482cd694a798a50f4406/7.2/buster/apache/apache2-foreground)
+Afin de communiquer entre l'intérieur et l'extérieur du container, nous avons décidé d'utiliser des variables d'environnement. Une variable STATIC_APP afin de récupérer l'adresse ip de notre serveur web statique, et une variable DYNAMIC_APP pour l'adresse du serveur dynamique. Avec le flag -e de la commande docker run, nous pouvons démarrer un container en lui passant des variables d'environnement initialisées. À l'intérieur du container du reverse-proxy, le script php décrit ci-dessous pourra récupérer les valeurs desdites variables, pour pouvoir ensuite les injecter dans le fichier de configuration.
 
-Finalement on construit l'image puis on lance le container et les deux sites sont visibles à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080) et [http://demo.api.ch:8080/pets/](http://demo.api.ch:8080/pets/)
+Notre propre script php cité ci-dessus, templates/config-template.php, récupère les deux variables avec la fonction php getenv( ), et print les variables dans le script de configuration de l'étape 3.
 
-    docker build -t api-rp .
-    docker run -d -e STATIC_APP=172.17.0.2:80 -e DYNAMIC_APP=172.17.0.3:3000 --name apache-rp -p 8080:80 api-rp
+Afin de générer dynamiquement notre fichier de configuration au démarrage du container, il est important d'observer comment est construite l'image php choisie pour notre reverse-proxy. Dans le Dockerfile de l'image, nous pouvons observer que la dernière instruction et le fait d'exécuter le script apache2-foreground au démarrage du container. Ce que nous avons fait, c'est reprendre ce script, que nous trouvons ici : [php:7.2/apache2-foreground](https://github.com/docker-library/php/blob/fbba7966bc4ca30a8bb2482cd694a798a50f4406/7.2/buster/apache/apache2-foreground), et de le modifier pour y ajouter l'exécution de notre propre script qui génère le fichier de configuration 001-reverse-proxy.conf à partir des variables d'environnement. 
+
+Dans le Dockerfile du reverse-proxy, il faut également copier la nouvelle version de apache2-foreground au bon endroit dans l'image, à savoir dans /usr/local/bin/ et d'ajouter le script php dans /var/apache2/templates.
+
+Finalement, nous pouvons reconstruire l'image du reverse-proxy pour prendre en compte les modifications : 
+
+    docker build -t api/api-rp .
+
+Puis, de manière similaire aux parties 3 et 4, nous pouvons tester notre infrastructure en suivant la procédure suivante, en assumant qu'aucun container n'est en cours d'exécution :
+    
+    docker run -d --name api-static api/api-static
+    docker run -d --name api-dynamic api/api-dynamic
+    
+Un fois ces deux service lancés, nous pouvons trouver leur adresse ip avec :
+
+    docker inspect api-static | grep -i ipaddr
+    docker inspect api-dynamic | grep -i ipaddr
+
+Et introduire finalement le résultat dans les variables d'environnements : 
+
+    docker run -d -e STATIC_APP=172.17.0.2:80 -e DYNAMIC_APP=172.17.0.3:3000 --name api-rp -p 8080:80 api/api-rp
+    
+Et nous pouvons admirer le resultat à l'adresse [http://demo.api.ch:8080](http://demo.api.ch:8080).
 
 # Partie 6 étapes additionelles
 
