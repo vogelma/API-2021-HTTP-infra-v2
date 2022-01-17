@@ -34,7 +34,7 @@ Nom des branches utilisées dans ce projet
     
 # Pré-avis
 
-Nous avons décidé de faire un repo chacune et de travailler chacune sur le sien en parallèle pour être sûre de bien comprendre la matière de ce cours. Ce repo est celui de Maëlle Vogel. Celui de Mélissa Gehring est visible à l'adresse: [https://github.com/Lollipoke/API-2021-HTTP-Infrastructure](https://github.com/Lollipoke/API-2021-HTTP-Infrastructure). Nous avons décidé arbitrairement d'ajouter notre rapport sur ce repo-là, et c'est également celui-là que nous soumettons pour la note.
+Nous avons décidé de faire un repo chacune et de travailler chacune sur le sien en parallèle pour être sûre de bien comprendre la matière de ce cours. Ce repo est celui de Maëlle Vogel. Celui de Mélissa Gehring est visible à l'adresse: [https://github.com/Lollipoke/API-2021-HTTP-Infrastructure](https://github.com/Lollipoke/API-2021-HTTP-Infrastructure). Nous avons décidé arbitrairement d'ajouter notre rapport sur ce repo-là (celui de Maëlle Vogel), et c'est également celui-là que nous soumettons pour la note.
    
 
 # Architecture du repo
@@ -68,22 +68,38 @@ Pour voir notre site à l'adresse [http://localhost:8080](http://localhost:8080)
 Note : en exécutant la commande /bin/bash sur notre container api-static en train de tourner, nous pouvons aller observer les fichiers de configuration du serveur apache. Ils se trouvent dans le dossier /etc/apache2/. On y trouve, entre autres, le fichier de configuration principal apache2.conf, ou encore la liste des fichiers de configuration pour plusieurs sites potentiels, situés dans le dossier sites-available. Cela nous sera utile pour les étapes ultérieures.
 
 
-# Partie 2 express web dynamic
+# Partie 2 : Serveur HTTP dynamique avec express.js (fb-express-dynamic)
 
-Pour cette deuxième partie nous avons besoin d'un image node pour faire fonctionner un script Javascript. La documentation demande de placer le script dans 
-le dossier /opt/app ce que fait la COPY du Dockerfile une fois encore. La ligne CMD permet d'exécuter le script.
+Pour cette deuxième partie nous avons utilisé l'image Docker node.js officielle pour run un script Javascript. La documentation officielle nous indique quoi mettre dans le Dockerfile : 
 
     FROM node:16.13
     COPY src/ /opt/app
     CMD ["node", "/opt/app/index.js"]
 
-Notre script génére un liste d'animaux colorés à adopter. La couleur pourrait être récupéré pour être affiché mais par manque de temps nous n'avons pas pû le faire.
-La liste est renouvelé à chaque rafraîchissement de page.
+A nouveau nous pouvons observer que le contenu du dossier local src/ est copié dans le dossier /opt/app de notre image. 
 
-Finalement il faut build puis run le container pour voir notre site à l'adresse [http://localhost:9090](http://localhost:9090)
+Nous avons exécuté dans notre dossier local src les commandes suivantes :
 
-    docker build -t api-dynamic .
-    docker run -p 9090:3000 -d --name api-dynamic api-dynamic
+    npm init
+    npm install --save chance
+    npm install --save express
+    
+Afin d'obtenir les fichiers nécessaires au démarrage d'une nouvelle application node.js, ainsi que les modules Chance (pour la génération aléatoire d'animaux et de couleurs), et Express.js (pour la création d'une application HTTP)
+
+Notre script index.js génère, à l'aide du module Chance, un liste d'animaux et de couleurs à adopter. La couleur pourra être récupérée dans les étapes ultérieures pour influencer la couleur du texte de l'animal. Nous avons également lancé une application HTTP à l'aide du framework Express.js qui se connecte au port 3000 et qui renvoie au client les paires d'animaux colorés générées.
+La liste est renouvelée à chaque rafraîchissement de page.
+
+La dernière ligne du Dockerfile, CMD, permet d'exécuter la commande node au lancement d'un container. Dans ce cas-ci, cela va exécuter le script 'index.js' situé dans le dossier /opt/app.
+   
+Finalement, nous pouvons build notre image :
+
+    docker build -t api/api-dynamic .
+
+Puis run le container :
+
+    docker run -p 9090:3000 -d --name api-dynamic api/api-dynamic    
+
+Pour voir notre site à l'adresse [http://localhost:9090](http://localhost:9090)
 
 # Partie 3 reverse proxy
 
